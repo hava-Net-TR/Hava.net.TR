@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Hava.Net</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;600&display=swap" rel="stylesheet">
+
+<style>
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+    font-family:'Inter',sans-serif;
+}
+
+body{
+    min-height:100vh;
+    background:#1b1f26;
+    color:white;
+    display:flex;
+    justify-content:center;
+    padding:20px;
+}
+
+.app{
+    width:100%;
+    max-width:420px;
+}
+
+/* SEARCH */
+.search-area{
+    background:rgba(255,255,255,0.05);
+    padding:15px;
+    border-radius:25px;
+    margin-bottom:20px;
+}
+
+select{
+    width:100%;
+    padding:12px;
+    margin:5px 0;
+    border-radius:12px;
+    border:none;
+    background:#2c333e;
+    color:white;
+    font-weight:600;
+    outline:none;
+}
+
+/* MAIN */
+.main-card{
+    text-align:center;
+}
+
+.icon-box{
+    height:140px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+.main-icon{
+    width:120px;
+    filter:drop-shadow(0 0 20px rgba(255,165,0,0.4));
+}
+
+.main-temp{
+    font-size:120px;
+    font-weight:100;
+}
+
+.status{
+    font-size:24px;
+    opacity:.8;
+    margin-bottom:30px;
+}
+
+/* INFO */
+.quick-info{
+    display:flex;
+    gap:10px;
+    margin-bottom:40px;
+}
+
+.info-item{
+    background:#2c333e;
+    flex:1;
+    padding:15px;
+    border-radius:20px;
+    text-align:center;
+}
+
+.info-item small{
+    font-size:11px;
+    opacity:.5;
+    display:block;
+}
+
+/* FORECAST */
+.forecast-scroll{
+    display:flex;
+    overflow-x:auto;
+    gap:12px;
+    padding-bottom:15px;
+}
+
+.forecast-scroll::-webkit-scrollbar{
+    display:none;
+}
+
+.forecast-card{
+    background:#2c333e;
+    min-width:95px;
+    padding:20px 10px;
+    border-radius:30px;
+    text-align:center;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<div class="search-area">
+<select id="citySel">
+<option value="">Şehir Seçin</option>
+</select>
+
+<select id="distSel" style="display:none;">
+<option value="">İlçe Seçin</option>
+</select>
+</div>
+
+<div id="ui" style="display:none;">
+
+<div class="main-card">
+<h2 id="lName">Şehir</h2>
+
+<div class="icon-box">
+<img id="mIcon" class="main-icon">
+</div>
+
+<div class="main-temp" id="mTemp">0°</div>
+<p class="status" id="mDesc">Durum</p>
+</div>
+
+<div class="quick-info">
+<div class="info-item"><small>HİSSEDİLEN</small><b id="fLike">0°</b></div>
+<div class="info-item"><small>NEM</small><b id="hum">%0</b></div>
+<div class="info-item"><small>RÜZGAR</small><b id="wnd">0 km/h</b></div>
+</div>
+
+<h3 style="margin-left:10px;margin-bottom:10px;">5 Günlük Tahmin</h3>
+<div class="forecast-scroll" id="dailyScroll"></div>
+
+</div>
+</div>
+
+<script>
+
+const key = "233a9818583d950ceb684fadd27c48ab";
+
+const cSel = document.getElementById("citySel");
+const dSel = document.getElementById("distSel");
+
+/* ŞEHİRLER */
+fetch("https://turkiyeapi.dev/api/v1/provinces")
+.then(r=>r.json())
+.then(res=>{
+    res.data.sort((a,b)=>a.name.localeCompare(b.name))
+    .forEach(p=>{
+        cSel.innerHTML+=`<option value="${p.name}">${p.name}</option>`;
+    });
+});
+
+/* İLÇELER */
+cSel.onchange = async ()=>{
+
+    dSel.innerHTML='<option value="">İlçe Seçin</option>';
+    if(!cSel.value) return;
+
+    const r = await fetch(`https://turkiyeapi.dev/api/v1/provinces?name=${cSel.value}`);
+    const res = await r.json();
+
+    res.data[0].districts.forEach(d=>{
+        dSel.innerHTML+=`<option value="${d.name}">${d.name}</option>`;
+    });
+
+    dSel.style.display="block";
+};
+
+/* HAVA VERİSİ */
+dSel.onchange = async ()=>{
+
+const district = dSel.value;
+const city = cSel.value; // ⭐ ARTIK ŞEHİR KULLANILIYOR
+
+const currReq = await fetch(
+`https://api.openweathermap.org/data/2.5/weather?q=${city},TR&appid=${key}&units=metric&lang=tr`
+);
+
+const foreReq = await fetch(
+`https://api.openweathermap.org/data/2.5/forecast?q=${city},TR&appid=${key}&units=metric&lang=tr`
+);
+
+const curr = await currReq.json();
+const fore = await foreReq.json();
+
+document.getElementById("ui").style.display="block";
+
+/* İSİM İLÇE OLARAK KALIR */
+lName.innerText = district;
+
+mTemp.innerText = Math.round(curr.main.temp)+"°";
+mDesc.innerText = curr.weather[0].description;
+fLike.innerText = Math.round(curr.main.feels_like)+"°";
+hum.innerText = "%"+curr.main.humidity;
+wnd.innerText = Math.round(curr.wind.speed*3.6)+" km/h";
+
+/* ICON */
+mIcon.src =
+`https://raw.githubusercontent.com/basmilius/weather-icons/master/production/fill/all/${getIconName(curr.weather[0].icon)}.svg`;
+
+/* ===== 7 GÜNLÜK TAHMİN ===== */
+
+dailyScroll.innerHTML="";
+
+const days = {};
+
+/* Her günün öğlen verisini seç */
+fore.list.forEach(item=>{
+    const date = new Date(item.dt*1000);
+    const hour = date.getHours();
+
+    if(hour === 12){
+        const keyDay = date.toDateString();
+        days[keyDay] = item;
+    }
+});
+
+/* 7 güne tamamla */
+Object.values(days).slice(0,7).forEach(day=>{
+
+const dateName =
+new Date(day.dt*1000)
+.toLocaleDateString("tr",{weekday:"short"});
+
+dailyScroll.innerHTML+=`
+<div class="forecast-card">
+<p style="opacity:.6">${dateName}</p>
+<img width="45"
+src="https://raw.githubusercontent.com/basmilius/weather-icons/master/production/fill/all/${getIconName(day.weather[0].icon)}.svg">
+<b>${Math.round(day.main.temp)}°</b>
+</div>`;
+});
+
+};
+
+/* ICON MAP */
+function getIconName(code){
+
+const map={
+"01d":"clear-day",
+"01n":"clear-night",
+"02d":"partly-cloudy-day",
+"02n":"partly-cloudy-night",
+"03d":"cloudy",
+"04d":"overcast-day",
+"09d":"rain",
+"10d":"partly-cloudy-day-rain",
+"11d":"thunderstorms-day",
+"13d":"snow",
+"50d":"mist"
+};
+
+return map[code] || "clear-day";
+}
+
+</script>
+
+</body>
+</html>
